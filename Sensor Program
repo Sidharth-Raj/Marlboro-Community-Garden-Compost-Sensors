@@ -1,0 +1,155 @@
+// This #include statement was automatically added by the Particle IDE.
+#include <DS18B20.h>
+
+// This #include statement was automatically added by the Particle IDE.
+#include <DS18B20.h>
+#include <math.h>
+char     szInfo[64];
+int first;
+double   celsius;
+double intermediate;
+int moisture;
+int i = 0;
+double   temperature;
+uint32_t msLastMetric;
+uint32_t msLastSample;
+const int      MAXRETRY          = 4;
+float voltage = 0;
+int publishCount = 0;
+bool succ = 0;
+const char * mykey = "B049XHVLIULGJSST";
+
+SYSTEM_MODE(MANUAL); 
+SYSTEM_THREAD(ENABLED);
+//60
+//#define VOLT_MESSAGE "volt_stationD"
+#define THE_MESSAGE "msg_stationD"
+//#define VOLT_NUMBER
+//#define NUMBER_ONE
+//#define NUMBER_TWO
+#define PUBLISH_INTERVAL 2      //in multiples of SHORT_SLEEP
+#define SHORT_SLEEP 2     // in seconds, wake up this often to blink LED
+#define BLINK_INTERVAL 30    // in milliseconds, LED will be ON for half this time and OFF for half this time
+#define RED 255,0,0,128
+#define GREEN 0,255,0,128
+#define YELLOW 255,255,0,128
+#define WHITE 255,255,255,16
+#define BLUE 0,0,255,128
+char msg[256];
+char msg2[256];
+DS18B20  ds18b20(D9, true);
+
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(D10,OUTPUT);
+  pinMode(D13,OUTPUT);
+  
+  pinMode(A5,INPUT);
+  digitalWrite(D10,LOW);
+  int publishCount=0;
+}
+
+
+void loop() {
+    if (publishCount==PUBLISH_INTERVAL)
+    {
+    //delay(1000);
+    publishCount = 0;
+    digitalWrite(D10,HIGH);
+    digitalWrite(D13,HIGH);
+    delay(1000);
+    getTemp();
+    
+    first = analogRead(A5);
+    if (first>4000)
+    {
+        first = 4000;
+    }
+    intermediate = ((4000 - first)/40);
+    moisture = intermediate;
+    digitalWrite(D10,LOW);
+    digitalWrite(D13,LOW);
+    voltage = analogRead(BATT) * 0.0011224;
+    
+    //voltage = 5;
+    //temperature = 5;
+    //moisture = 5;
+    
+    succ=connect_to_mesh();
+      if (succ){  
+        delay(100);
+        snprintf(msg, sizeof(msg),"\"7\":\"%2.2f\",\"8\":\"%d\"", temperature, moisture);
+        snprintf(msg2,sizeof(msg2), "\"4\":\"%1.1f\"",  voltage);
+        //Mesh.publish(THE_MESSAGE,msg);
+        //delay(200);
+        //Mesh.publish(THE_MESSAGE,msg);
+        //delay(200);
+        //Mesh.publish(THE_MESSAGE,msg);
+        //delay(200);
+        Mesh.publish("volt_stationD",msg2);
+        //delay(200);
+        //Mesh.publish("volt_stationD",msg2);
+        //delay(200);
+        //Mesh.publish("volt_stationD",msg2);
+        //delay(200);
+        publishCount=0;
+        
+      }
+      delay(5000); //delay for publish to succeed
+      Mesh.disconnect();
+      Mesh.off();
+      if (!succ) blink_LED(RED); // blink leds and disconnect
+      
+    }
+    else publishCount++;
+  blink_LED(BLUE);
+  System.sleep({},{},SHORT_SLEEP);
+  }
+
+
+void getTemp(){
+  float _temp;
+  int   i = 0;
+
+  do {
+    _temp = ds18b20.getTemperature();
+  } while (!ds18b20.crcCheck() && MAXRETRY > i++);
+
+  if (i < MAXRETRY) {
+    celsius = _temp;
+    temperature = ds18b20.convertToFahrenheit(_temp);
+    Serial.println(temperature);
+  }
+  else {
+    celsius = temperature = NAN;
+    Serial.println("Invalid reading");
+  }
+  msLastSample = millis();
+}
+
+
+
+void blink_LED(int Rcolor, int Gcolor, int Bcolor, int brightness){
+  RGB.color(Rcolor,Gcolor,Bcolor);
+  RGB.brightness(brightness);
+  delay(BLINK_INTERVAL/2);
+  RGB.brightness(0);
+  delay(BLINK_INTERVAL/2);
+}
+
+bool connect_to_mesh(){  //returns true if mesh connect was successful
+  int i,ready;
+  //Particle.disconnect();
+  Mesh.on();
+  Mesh.connect();
+  i=0;
+  ready=0;
+    while(i< (30000/BLINK_INTERVAL) && !ready){ // total 20 seconds timeout waiting for Mesh connect
+      ready=Mesh.ready();
+      blink_LED(YELLOW);
+      Particle.process();
+      i++;
+    }
+    return(ready);
+}
