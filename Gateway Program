@@ -1,14 +1,14 @@
 SYSTEM_MODE(MANUAL);
 SYSTEM_THREAD(ENABLED);
 //3550
-#define PUBLISH_INTERVAL    1800/5       //in 5's of seconds
+#define PUBLISH_INTERVAL 3600/10       //in 10's of seconds
 #define BLINK_INTERVAL 50    // in milliseconds, ON for half this time and OFF for half this time
 #define RED 255,0,0,128
 #define GREEN 0,255,0,128
 #define YELLOW 255,255,0,128
 #define WHITE 255,255,255,16
 #define BLUE 0,0,255,200
-#define VOLT_SLEEP 300
+#define VOLT_SLEEP 3600
 
 String thestring;
 String mystring1;
@@ -28,225 +28,197 @@ String voltage3;
 String voltage4;
 char voltage5[256];
 String thevolt;
-bool rcvdvolt1;
-bool rcvdvolt2;
-bool rcvdvolt3;
-bool rcvdvolt4;
 double argonvolt;
 double volting;
 String voltstring;
+int alive_count1 = 0;
+int alive_count2 = 0;
+int alive_count3 = 0;
+int alive_count4 = 0;
 
-void my_delay(uint32_t delay_value)
-{
-    for(uint32_t _ms = millis(); millis()-_ms < delay_value; Particle.process());
+uint32_t lastReset = 0;
+
+void my_delay(int dvalue){  //in multiples of BLINK_INTERVAL
+
+  int k;
+  for (k=0;k<dvalue;k++){
+    delay(BLINK_INTERVAL);
+    Particle.process();
+  }
 }
 
 void RcvMsg1(const char *event, const char *data)
 {
-  blink_LED(GREEN);
+  //blink_LED(GREEN);
   mystring1=data;
-  rcvd_msg1=1;
- 
+   rcvd_msg1=1;
+ alive_count1=6;  //heard from this sensor within the last 6 hours
 }
 void RcvMsg2(const char *event, const char *data)
 {
-  blink_LED(GREEN);
+  //blink_LED(GREEN);
   mystring2=data;
   rcvd_msg2=1;
- 
+ alive_count2=6;
 }
 
 void RcvMsg3(const char *event, const char *data)
 {
-  blink_LED(GREEN);
+  //blink_LED(GREEN);
   mystring3=data;
   
   rcvd_msg3=1;
- 
+ alive_count3=6;
 }
 
 void RcvMsg4(const char *event, const char *data)
 {
-  blink_LED(GREEN);
+  //blink_LED(GREEN);
   mystring4=data;
-  
   rcvd_msg4=1;
- 
-}
-
-void voltrcv1(const char *event, const char *data)
-{
-    blink_LED(GREEN);
-    voltage1 = data;
-    rcvdvolt1 = 1;
-}
-
-void voltrcv2(const char *event, const char *data)
-{
-    blink_LED(GREEN);
-    voltage2 = data;
-    rcvdvolt2 = 1;
-}
-
-void voltrcv3(const char *event, const char *data)
-{
-    blink_LED(GREEN);
-    voltage3 = data;
-    rcvdvolt3 = 1;
-}
-
-void voltrcv4(const char *event, const char *data)
-{
-    blink_LED(GREEN);
-    voltage4 = data;
-    rcvdvolt4 = 1;
+ alive_count4=6;
 }
 
 void setup() {
-WiFi.disconnect();
-WiFi.off();
+   digitalWrite(ANTSW1, 1);  //external antenna
+	 digitalWrite(ANTSW2, 0);   
+   lastReset = millis();
+   WiFi.off(); 
+   Mesh.on();
+   Mesh.connect();
+   waitUntil(Mesh.ready);
+ 
+   RGB.control(true); // take over RGB LED
+   pinMode(D7, OUTPUT);
+   for (int j=0;j<10;j++) blink_LED(WHITE);
 
-Mesh.on();
-Mesh.connect();
-waitUntil(Mesh.ready);
+   Mesh.subscribe("msg_stationA", RcvMsg1);
+   Mesh.subscribe("msg_stationB", RcvMsg2);
+   Mesh.subscribe("msg_stationC", RcvMsg3);
+   Mesh.subscribe("msg_stationD", RcvMsg4);
 
-RGB.control(true); // take over RGB LED
-pinMode(D7, OUTPUT);
-Mesh.subscribe("msg_stationA",RcvMsg1);
-Mesh.subscribe("msg_stationB", RcvMsg2);
-Mesh.subscribe("msg_stationC", RcvMsg3);
-Mesh.subscribe("msg_stationD", RcvMsg4);
+   publish_count=0;
+   rcvd_msg1=0; rcvd_msg2=0;rcvd_msg3=0;rcvd_msg4=0;
 
-Mesh.subscribe("volt_stationA", voltrcv1);
-Mesh.subscribe("volt_stationB", voltrcv2);
-Mesh.subscribe("volt_stationC", voltrcv3);
-Mesh.subscribe("volt_stationD", voltrcv4);
-
-publish_count=0;
-rcvd_msg1=0; rcvd_msg2=0;rcvd_msg3=0;rcvd_msg4=0;
-rcvdvolt1 = 0; rcvdvolt2=0; rcvdvolt3 = 0; rcvdvolt4=0;
 }
 
 void loop() {
-Mesh.on();
+ 
+  Mesh.on();
   Mesh.connect();
   waitUntil(Mesh.ready);
-if (millis()>3*24*3600*1000)
-
-{
-    System.reset();
-}
-  volting = analogRead(BATT) * 0.0011224;
   
-  /*if (volting<=3.8)
-    {
-        
-        
-        while (volting<3.9)
-        {
-                System.sleep({},{},VOLT_SLEEP);
-                blink_LED(RED);
-                volting=analogRead(BATT) * 0.0011224;
+  
+  if (millis() - lastReset > 3*24*60*60000UL) {  //force reset after 3 days of working.
+    System.reset();
+  }
 
-        }
-        System.reset();
-    }*/
-    
-
-
-if (publish_count>=PUBLISH_INTERVAL)
-{
+  if (publish_count>=PUBLISH_INTERVAL)
+  {
     publish_count=0;
-    voltstring = "{";  
-    if (rcvdvolt1==1)
-    {
-        voltstring+=voltage1;
-        voltstring+=",";
-    }
-    if (rcvdvolt2==1)
-    {
-        voltstring+=voltage2;
-        voltstring+=",";
-    }
-    if (rcvdvolt3==1)
-    {
-        voltstring+=voltage3;
-        voltstring+=",";
-    }
-    if (rcvdvolt4==1)
-    {
-        voltstring+=voltage4;
-        voltstring+=",";
-    }
+    
+    if (alive_count1>0) alive_count1--;
+    if (alive_count2>0) alive_count2--;
+    if (alive_count3>0) alive_count3--;
+    if (alive_count4>0) alive_count4--;
+    
     argonvolt=analogRead(BATT) * 0.0011224;
     snprintf(voltage5, sizeof(voltage5), "\"5\":\"%1.2f\"",  argonvolt);
-    voltstring+=voltage5;
-    voltstring+=",";
-    voltstring+=voltkey;
-    voltstring+="}";
+    
     thestring="{";
+    voltstring="{";
     if (rcvd_msg1==1)
     {
-        thestring+=mystring1;
+        thestring+=mystring1.substring(0,19);
         thestring+=",";
+        voltstring+=mystring1.substring(20,29);
+        voltstring+=",";
     }
     if (rcvd_msg2==1)
     {
-        thestring+=mystring2;
+        thestring+=mystring2.substring(0,19);
         thestring+=",";
+        voltstring+=mystring2.substring(20,29);
+        voltstring+=",";
     }
     if (rcvd_msg3==1)
     {
-        thestring+=mystring3;
+        thestring+=mystring3.substring(0,19);
         thestring+=",";
+        voltstring+=mystring3.substring(20,29);
+        voltstring+=",";
     }
     if (rcvd_msg4==1)
     {
-        thestring+=mystring4;
+        thestring+=mystring4.substring(0,19);
         thestring+=",";
+        voltstring+=mystring4.substring(20,29);
+        voltstring+=",";
     }
+    voltstring+=voltage5;
+    voltstring+=",";
+    
+    voltstring+=voltkey;
+    voltstring+="}";
     thestring+=mykey;
     thestring+="}";
+    
     succ = connect_to_cloud();
     if (succ) 
     {
         Particle.publish("voltaire", voltstring, PUBLIC);
-        rcvdvolt1 = 0; rcvdvolt2=0; rcvdvolt3 = 0; rcvdvolt4=0;
-        my_delay(1000);
+        
+        my_delay(1000/BLINK_INTERVAL); //1 second delay
         if (rcvd_msg1==1 || rcvd_msg2==1 || rcvd_msg3==1 || rcvd_msg4==1)
-        {
+        {       
+            Particle.publish(eventName,thestring, PUBLIC);     
         
-            Particle.publish(eventName,thestring, PUBLIC);
-        
-            rcvd_msg1=0;
-            rcvd_msg2=0;
-            rcvd_msg3=0;
-            rcvd_msg4=0;
-        
-            
         }
-        my_delay(5000);
-        disconnect_cloud(succ);
+        rcvd_msg1=0;
+        rcvd_msg2=0;
+        rcvd_msg3=0;
+        rcvd_msg4=0;
         
+    } //if succ
+    disconnect_cloud(succ); //has a 5 sec delay inside
+
+  }  // if publish 
+
+
+  volting = analogRead(BATT) * 0.0011224;
+  if (volting<=3.55)
+    {
+        
+        while (volting<3.65)
+        {
+                System.sleep({},{},VOLT_SLEEP);
+                volting=analogRead(BATT) * 0.0011224;
+
+        }
+        //System.reset();
     }
     
-    
-    
-  }
+
   
   publish_count++;
+
+  //following status display sequence takes 10 secs. runs every cycle.
   blink_LED(BLUE);
-  my_delay(1000-BLINK_INTERVAL);
-  if (rcvd_msg1) blink_LED(GREEN);  else blink_LED(RED);
-  my_delay(1000-BLINK_INTERVAL);
-  if (rcvd_msg2) blink_LED(GREEN);  else blink_LED(RED);
-  my_delay(1000-BLINK_INTERVAL);
-  Particle.process();
-  if (rcvd_msg3) blink_LED(GREEN);  else blink_LED(RED);
-  my_delay(1000-BLINK_INTERVAL);
-  if (rcvd_msg4) blink_LED(GREEN);  else blink_LED(RED);
-  my_delay(1000-BLINK_INTERVAL);
-}
+  my_delay(2000/BLINK_INTERVAL-1);
+  if (alive_count1>0) blink_LED(GREEN);  else blink_LED(RED);
+  my_delay(2000/BLINK_INTERVAL-1);
+  if (alive_count2>0) blink_LED(GREEN);  else blink_LED(RED);
+  my_delay(2000/BLINK_INTERVAL-1);
+  
+  if (alive_count3>0) blink_LED(GREEN);  else blink_LED(RED);
+  my_delay(2000/BLINK_INTERVAL-1);
+  if (alive_count4>0) blink_LED(GREEN);  else blink_LED(RED);
+  my_delay(2000/BLINK_INTERVAL-1);
+
+} //main loop
+
+
+
 
 bool connect_to_cloud(){  //returns true if mesh connect was successful
   int i;
@@ -255,18 +227,17 @@ bool connect_to_cloud(){  //returns true if mesh connect was successful
     i=0;
     while(i< (30000/BLINK_INTERVAL) && !WiFi.ready()){ // total 30 seconds timeout waiting for Wifi connect
       blink_LED(YELLOW);
-      Particle.process();
+      //Particle.process();
       i++;
     } 
-    //waitFor(WiFi.ready, 60000);
+    
     Particle.connect();
     i=0;
     while(i< (30000/BLINK_INTERVAL) && !Particle.connected()){ // total 20 seconds timeout waiting for Mesh connect
       blink_LED(YELLOW);
-      Particle.process();
       i++;
     } 
-    //waitFor(Particle.connected,1000);
+    
   
     return(Particle.connected());
 }
@@ -277,15 +248,18 @@ void blink_LED(int Rcolor, int Gcolor, int Bcolor, int brightness){
   RGB.color(Rcolor,Gcolor,Bcolor);
   RGB.brightness(brightness);
   delay(BLINK_INTERVAL/2);
+  Particle.process();
   RGB.brightness(0);
   delay(BLINK_INTERVAL/2);
   Particle.process();
 }
 
 void disconnect_cloud(bool success){
+      
+      if (success) for(i=0;i<(5000/BLINK_INTERVAL);i++) blink_LED(GREEN); //need 5 second delay, to complete pending publishes
+      else  for (i=0;i<(5000/BLINK_INTERVAL);i++) blink_LED(RED);
       Particle.disconnect();
       WiFi.disconnect();
       WiFi.off();  
-      if (success) for(i=0;i<(1000/BLINK_INTERVAL);i++) blink_LED(GREEN); //need 1 second delay
-      else  for (i=0;i<(1000/BLINK_INTERVAL);i++) blink_LED(RED);
     }
+
