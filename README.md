@@ -6,9 +6,9 @@ The design is based on Mesh and WiFi modules from Particle Systems. Gateway modu
 
 Software Design
 Software is designed to conserve batteries, the sensors wake up every one hour, read the temperature and moisture values. Estimated battery life is around 4 years before needing replacement. The gateway is always on on the mesh side, however it keeps the WiFi switched off to conserve power. It wakes up every one hour to transmit the sensor values received from all four sensors to the cloud.
-I used Thingspeak.com to connect to the Particle cloud and display the sensor values in real time. You can see the real time values here: Marlboro Community Garden - ThingSpeak IoT The voltage levels of all the devices are also displayed here: voltage - ThingSpeak IoT.
-I have also uploaded the code and schematics to Github: 
-Sidharth-Raj/Marlboro-Community-Garden-Compost-Sensors (github.com)
+See the file Eagle Project Links.docx for links to real time display of sensor data and voltages.
+
+
 Problems faced:
 The system was installed in July 2020 and is working continuously since then. After a major storm and cloudy weather, the gateway stopped working. After investigation, it was due to the deeply discharged battery and the small solar panel. I modified the software to continuously monitor the battery voltage and put the gateway to sleep when it goes below a threshold. I also changed the solar panel to a bigger size (from 2W to 6W). With these changes, the system has been working reliably through winter and multiple snow storms.
 
